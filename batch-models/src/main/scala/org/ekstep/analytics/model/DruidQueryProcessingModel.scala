@@ -46,7 +46,9 @@ object DruidQueryProcessingModel extends IBatchModelTemplate[DruidOutput, DruidO
   override def preProcess(data: RDD[DruidOutput], config: Map[String, AnyRef])(implicit sc: SparkContext, fc: FrameworkContext): RDD[DruidOutput] = {
 
     val reportConfig = JSONUtils.deserialize[ReportConfig](JSONUtils.serialize(config.getOrElse("reportConfig", Map()).asInstanceOf[Map[String, AnyRef]]))
-    setStorageConf(getStringProperty(config, "store", "local"), reportConfig.storageKey, reportConfig.storageSecret)
+    val key = reportConfig.storageKey.getOrElse(AppConf.getConfig("storage.key.config"))
+    val secret = reportConfig.storageSecret.getOrElse(AppConf.getConfig("storage.secret.config"))
+    setStorageConf(getStringProperty(config, "store", "local"), Option(key), Option(secret))
     data
   }
 
