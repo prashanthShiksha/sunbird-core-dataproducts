@@ -13,7 +13,7 @@ import org.ekstep.analytics.framework.driver.BatchJobDriver.getMetricJson
 import org.ekstep.analytics.framework.exception.DruidConfigException
 import org.ekstep.analytics.framework.fetcher.DruidDataFetcher
 import org.ekstep.analytics.framework.util.DatasetUtil.extensions
-import org.ekstep.analytics.framework.util.{CommonUtil, HTTPClient, JSONUtils, JobLogger, MergeUtil}
+import org.ekstep.analytics.framework.util.{CloudStorageProviders, CommonUtil, HTTPClient, JSONUtils, JobLogger, MergeUtil}
 import org.ekstep.analytics.model.{OutputConfig, QueryInterval, ReportConfig}
 import org.joda.time.{DateTime, DateTimeZone}
 
@@ -25,19 +25,20 @@ trait BaseDruidQueryProcessor {
 
   def setStorageConf(store: String, accountKey: Option[String], accountSecret: Option[String])(implicit sc: SparkContext) {
 
-    store.toLowerCase() match {
-      case "s3" =>
-        sc.hadoopConfiguration.set("fs.s3n.awsAccessKeyId", AppConf.getConfig(accountKey.getOrElse("aws_storage_key")));
-        sc.hadoopConfiguration.set("fs.s3n.awsSecretAccessKey", AppConf.getConfig(accountSecret.getOrElse("aws_storage_secret")));
-      case "oci" =>
-        sc.hadoopConfiguration.set("fs.s3n.awsAccessKeyId", AppConf.getConfig(accountKey.getOrElse("aws_storage_key")));
-        sc.hadoopConfiguration.set("fs.s3n.awsSecretAccessKey", AppConf.getConfig(accountSecret.getOrElse("aws_storage_secret")));
-      case "azure" =>
-        sc.hadoopConfiguration.set("fs.azure", "org.apache.hadoop.fs.azure.NativeAzureFileSystem")
-        sc.hadoopConfiguration.set("fs.azure.account.key." + AppConf.getConfig(accountKey.getOrElse("azure_storage_key")) + ".blob.core.windows.net", AppConf.getConfig(accountSecret.getOrElse("azure_storage_secret")))
-      case _ =>
-      // Do nothing
-    }
+    CloudStorageProviders.setSparkCSPConfigurations(sc, store, accountKey, accountSecret)
+//    store.toLowerCase() match {
+//      case "s3" =>
+//        sc.hadoopConfiguration.set("fs.s3n.awsAccessKeyId", AppConf.getConfig(accountKey.getOrElse("aws_storage_key")));
+//        sc.hadoopConfiguration.set("fs.s3n.awsSecretAccessKey", AppConf.getConfig(accountSecret.getOrElse("aws_storage_secret")));
+//      case "oci" =>
+//        sc.hadoopConfiguration.set("fs.s3n.awsAccessKeyId", AppConf.getConfig(accountKey.getOrElse("aws_storage_key")));
+//        sc.hadoopConfiguration.set("fs.s3n.awsSecretAccessKey", AppConf.getConfig(accountSecret.getOrElse("aws_storage_secret")));
+//      case "azure" =>
+//        sc.hadoopConfiguration.set("fs.azure", "org.apache.hadoop.fs.azure.NativeAzureFileSystem")
+//        sc.hadoopConfiguration.set("fs.azure.account.key." + AppConf.getConfig(accountKey.getOrElse("azure_storage_key")) + ".blob.core.windows.net", AppConf.getConfig(accountSecret.getOrElse("azure_storage_secret")))
+//      case _ =>
+//      // Do nothing
+//    }
 
   }
 
