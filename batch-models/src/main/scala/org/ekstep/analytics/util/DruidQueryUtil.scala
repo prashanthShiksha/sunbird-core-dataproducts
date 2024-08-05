@@ -17,6 +17,9 @@ case class StateLookup(lookupExtractorFactory: LookUpMap)
 
 object DruidQueryUtil {
     def removeInvalidLocations(mainDf: DataFrame, filterDf: DataFrame, columns: List[String])(implicit sc: SparkContext): DataFrame = {
+        println(s"------ at DruidQueryUtil -------------")
+        println(s"filterDf.count()")
+        println(filterDf.count())
         if (filterDf.count() > 0) {
             mainDf.join(filterDf, columns, "inner")
         }
@@ -27,13 +30,19 @@ object DruidQueryUtil {
 
 
     def getValidLocations(restUtil: HTTPClient)(implicit sc: SparkContext): DataFrame = {
+        println("-------------inside getValidLocations ------------------")
         implicit val sqlContext = new SQLContext(sc)
         import sqlContext.implicits._
         val locationUrl = AppConf.getConfig("location.search.url")
+        println(s"locationUrl = $locationUrl")
         val headers = Map("Authorization" -> AppConf.getConfig("location.search.token"))
+        println(s"headers = $headers")
         val request = AppConf.getConfig("location.search.request")
+        println(s"request = $request")
         val response = restUtil.post[LocationResponse](locationUrl, request, Option(headers))
+        println(s"response = $response")
         val stateLookup = getStateLookup(restUtil)
+        println(s"stateLookup = $stateLookup")
         val masterDf = if (null != response && !stateLookup.isEmpty) {
             val states = response.result.response.map(f => {
                 if (f.getOrElse("type", "").equalsIgnoreCase("state"))

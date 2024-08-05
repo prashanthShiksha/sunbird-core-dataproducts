@@ -44,48 +44,71 @@ object DruidQueryProcessingModel extends IBatchModelTemplate[DruidOutput, DruidO
 
 
   override def preProcess(data: RDD[DruidOutput], config: Map[String, AnyRef])(implicit sc: SparkContext, fc: FrameworkContext): RDD[DruidOutput] = {
-
+    println(s"----------- started preProcess in Druid Query Processing Model ------------")
     val reportConfig = JSONUtils.deserialize[ReportConfig](JSONUtils.serialize(config.getOrElse("reportConfig", Map()).asInstanceOf[Map[String, AnyRef]]))
+    println(s"reportConfig = $reportConfig")
     setStorageConf(getStringProperty(config, "store", "local"), reportConfig.storageKey, reportConfig.storageSecret)
     data
   }
 
   override def algorithm(data: RDD[DruidOutput], config: Map[String, AnyRef])(implicit sc: SparkContext, fc: FrameworkContext): RDD[DruidOutput] = {
+    print("------------ started processing algorithm --------------")
     val streamQuery = config.getOrElse("streamQuery", false).asInstanceOf[Boolean]
+    println(s"streamQuery : $streamQuery")
     val exhaustQuery = config.getOrElse("exhaustQuery", false).asInstanceOf[Boolean]
+    println(s"exhaustQuery : $exhaustQuery")
     val strConfig = config("reportConfig").asInstanceOf[Map[String, AnyRef]]
+    println(s"strConfig : $strConfig")
     val reportConfig = JSONUtils.deserialize[ReportConfig](JSONUtils.serialize(strConfig))
+    println(s"reportConfig : $reportConfig")
 
     fetchDruidData(reportConfig, streamQuery, exhaustQuery)
   }
 
 
   override def postProcess(data: RDD[DruidOutput], config: Map[String, AnyRef])(implicit sc: SparkContext, fc: FrameworkContext): RDD[DruidOutput] = {
+      println(s"------------started processing postProcess in Druid Query Processing Model ------------ ")
       val configMap = config("reportConfig").asInstanceOf[Map[String, AnyRef]]
+      println(s"configMap = $configMap")
       val reportConfig = JSONUtils.deserialize[ReportConfig](JSONUtils.serialize(configMap))
-
+      println(s"reportConfig = $reportConfig")
       val dimFields = reportConfig.metrics.flatMap { m =>
         if (m.druidQuery.dimensions.nonEmpty) m.druidQuery.dimensions.get.map(f => f.aliasName.getOrElse(f.fieldName))
         else if(m.druidQuery.sqlDimensions.nonEmpty) m.druidQuery.sqlDimensions.get.map(f => f.fieldName)
         else List()
       }
+      println(s"dimFields = $dimFields")
       val labelsLookup = reportConfig.labels ++ Map("date" -> "Date")
+      println(s"labelsLookup = $labelsLookup")
       implicit val sqlContext = new SQLContext(sc)
       import sqlContext.implicits._
       //Using foreach as parallel execution might conflict with local file path
       val dataCount = sc.longAccumulator("DruidReportCount")
+      println(s"dataCount = $dataCount")
       reportConfig.output.foreach { f =>
         val df = getReportDF(RestUtil,f,data,dataCount).na.fill(0)
+        df.show()
+        println(dataCount.value)
         if (dataCount.value > 0) {
           val metricFields = f.metrics.distinct
+          println(s"metricFields = $metricFields")
           val fieldsList = (dimFields ++ metricFields ++ List("date")).distinct
+          println(s"fieldsList = $fieldsList")
           val metricsLabels=  metricFields.map(f=> labelsLookup.getOrElse(f,f)).distinct
+          println(s"metricsLabels = $metricsLabels")
           val columnOrder = (List("Date") ++ dimFields.map(f=> labelsLookup.getOrElse(f,f))
             .filter(f => !metricFields.contains(f)) ++ metricsLabels).distinct
+          println(s"columnOrder = $columnOrder")
           val dimsLabels = labelsLookup.filter(x => f.dims.contains(x._1)).values.toList
+          println(s"dimsLabels = $dimsLabels")
           val filteredDf = df.select(fieldsList.head, fieldsList.tail: _*)
+          println(s"---------filteredDf---------")
+          filteredDf.show()
           val renamedDf = filteredDf.select(filteredDf.columns.map(c => filteredDf.col(c).as(labelsLookup.getOrElse(c, c))): _*).na.fill("unknown")
+          println(s"--------renamedDf-----------")
+          renamedDf.show()
           val reportFinalId = if (f.label.nonEmpty && f.label.get.nonEmpty) reportConfig.id + "/" + f.label.get else reportConfig.id
+          println(s"reportFinalId = $reportFinalId")
           val filesWithSize = saveReport(renamedDf, config ++ Map("dims" -> dimsLabels, "metricLabels" -> metricsLabels,
           "reportId" -> reportFinalId, "fileParameters" -> f.fileParameters, "format" -> f.`type`), f.zip, Option(columnOrder))
           val totalFileSize = filesWithSize.map(f => f._2).sum
