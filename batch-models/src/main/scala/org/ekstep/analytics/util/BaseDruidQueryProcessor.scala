@@ -86,6 +86,7 @@ trait BaseDruidQueryProcessor {
           JSONUtils.deserialize[Map[String, AnyRef]](JSONUtils.serialize(f.druidQuery)) ++ Map("intervalSlider" -> interval.intervalSlider, "intervals" -> queryInterval)
         println(s"queryConfig = $queryConfig")
         val data = if (streamQuery) {
+          println(s"-----inside streamQuery process function-------")
           DruidDataFetcher.getDruidData(JSONUtils.deserialize[DruidQueryModel](JSONUtils.serialize(queryConfig)), true)
         }
         else {
