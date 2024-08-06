@@ -91,7 +91,10 @@ trait BaseDruidQueryProcessor {
         else {
           DruidDataFetcher.getDruidData(JSONUtils.deserialize[DruidQueryModel](JSONUtils.serialize(queryConfig)))
         }
-        print(s"data = $data")
+        println("Sample data from the RDD:")
+        data.take(5).foreach(println)
+        val count = data.count()
+        println(s"Number of records in the RDD: $count")
         data.map { x =>
           val dataMap = JSONUtils.deserialize[Map[String, AnyRef]](x)
           val key = dataMap.filter(m => (queryDims.flatten ++ List("date")).contains(m._1)).values.map(f => f.toString).toList.sorted(Ordering.String.reverse).mkString(",")
